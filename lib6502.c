@@ -62,7 +62,7 @@ enum {
 
 #define NAND(P, Q)	(!((P) & (Q)))
 
-#define tick(n)
+#define tick(n, t)
 #define tickIf(p)
 
 /* memory access (indirect if callback installed) -- ARGUMENTS ARE EVALUATED MORE THAN ONCE! */
@@ -743,7 +743,6 @@ static void oops(void)
   fprintf(stderr, "\noops -- instruction dispatch missing\n");
 }
 
-
 void M6502_run(M6502 *mpu)
 {
 #if defined(__GNUC__) && !defined(__STRICT_ANSI__)
@@ -811,6 +810,50 @@ void M6502_run(M6502 *mpu)
   (void)oops;
 }
 
+void   M6502_tick(M6502 *mpu)
+{
+    if (! mpu->tick-- )
+    {
+	M6502_step(mpu);
+	int next = mpu->memory[mpu->registers->pc];
+    }
+}
+
+void   M6502_step(M6502 *mpu)
+{
+
+# define begin()				switch (memory[PC++]) {
+# define fetch()
+# define next()					break
+# define dispatch(num, name, mode, cycles)	case 0x##num: name(cycles, mode);  next()
+# define end()					}
+    
+    
+    register byte  *memory= mpu->memory;
+    register word   PC;
+    word		  ea;
+    byte		  A, X, Y, P, S;
+    M6502_Callback *readCallback=  mpu->callbacks->read;
+    M6502_Callback *writeCallback= mpu->callbacks->write;
+    
+# define internalise()	A= mpu->registers->a;  X= mpu->registers->x;  Y= mpu->registers->y;  P= mpu->registers->p;  S= mpu->registers->s;  PC= mpu->registers->pc
+# define externalise()	mpu->registers->a= A;  mpu->registers->x= X;  mpu->registers->y= Y;  mpu->registers->p= P;  mpu->registers->s= S;  mpu->registers->pc= PC
+    
+    internalise();
+    
+    begin();
+    do_insns(dispatch);
+    end();
+    
+# undef begin
+# undef internalise
+# undef externalise
+# undef fetch
+# undef next
+# undef dispatch
+# undef end
+
+}
 
 int M6502_disassemble(M6502 *mpu, word ip, char buffer[64])
 {
@@ -878,6 +921,7 @@ M6502 *M6502_new(M6502_Registers *registers, M6502_Memory memory, M6502_Callback
   mpu->registers = registers;
   mpu->memory    = memory;
   mpu->callbacks = callbacks;
+  mpu->tick = 0;
 
   return mpu;
 }

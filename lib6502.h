@@ -43,6 +43,7 @@ struct _M6502
   uint8_t	  *memory;
   M6502_Callbacks *callbacks;
   unsigned int	   flags;
+  unsigned char    tick;
 };
 
 enum {
@@ -56,6 +57,8 @@ extern void   M6502_reset(M6502 *mpu);
 extern void   M6502_nmi(M6502 *mpu);
 extern void   M6502_irq(M6502 *mpu);
 extern void   M6502_run(M6502 *mpu);
+extern void   M6502_tick(M6502 *mpu);
+extern void   M6502_step(M6502 *mpu);
 extern int    M6502_disassemble(M6502 *mpu, uint16_t addr, char buffer[64]);
 extern void   M6502_dump(M6502 *mpu, char buffer[64]);
 extern void   M6502_delete(M6502 *mpu);
@@ -72,4 +75,4 @@ extern void   M6502_delete(M6502 *mpu);
 #define M6502_setCallback(MPU, TYPE, ADDR, FN)	((MPU)->callbacks->TYPE[ADDR]= (FN))
 
 
-#endif __m6502_h
+#endif //__m6502_h

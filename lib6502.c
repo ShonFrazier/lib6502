@@ -812,7 +812,7 @@ void M6502_run(M6502 *mpu)
 
 void   M6502_tick(M6502 *mpu)
 {
-    if (! mpu->ticks-- )
+    if ( ! mpu->ticks-- )
     {
 		mpu->ticks = 0;
 		M6502_step(mpu);

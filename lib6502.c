@@ -62,7 +62,7 @@ enum {
 
 #define NAND(P, Q)	(!((P) & (Q)))
 
-#define tick(n, t)
+#define tick(n, cpu)   cpu->ticks += n
 #define tickIf(p)
 
 /* memory access (indirect if callback installed) -- ARGUMENTS ARE EVALUATED MORE THAN ONCE! */
@@ -84,26 +84,26 @@ enum {
 
 /* adressing modes (memory access direct) */
 
-#define implied(ticks)				\
-  tick(ticks);
+#define implied(ticks, cpu)				\
+  tick(ticks, cpu);
 
-#define immediate(ticks)			\
-  tick(ticks);					\
+#define immediate(ticks, cpu)			\
+  tick(ticks, cpu);					\
   ea= PC++;
 
-#define abs(ticks)				\
-  tick(ticks);					\
+#define abs(ticks, cpu)				\
+  tick(ticks, cpu);					\
   ea= memory[PC] + (memory[PC + 1] << 8);	\
   PC += 2;
 
-#define relative(ticks)				\
-  tick(ticks);					\
+#define relative(ticks, cpu)				\
+  tick(ticks, cpu);					\
   ea= memory[PC++];				\
   if (ea & 0x80) ea -= 0x100;			\
   tickIf((ea >> 8) != (PC >> 8));
 
-#define indirect(ticks)				\
-  tick(ticks);					\
+#define indirect(ticks, cpu)				\
+  tick(ticks, cpu);					\
   {						\
     word tmp;					\
     tmp= memory[PC]  + (memory[PC  + 1] << 8);	\
@@ -111,43 +111,43 @@ enum {
     PC += 2;					\
   }
 
-#define absx(ticks)						\
-  tick(ticks);							\
+#define absx(ticks, cpu)						\
+  tick(ticks, cpu);							\
   ea= memory[PC] + (memory[PC + 1] << 8);			\
   PC += 2;							\
   tickIf((ticks == 4) && ((ea >> 8) != ((ea + X) >> 8)));	\
   ea += X;
 
-#define absy(ticks)						\
-  tick(ticks);							\
+#define absy(ticks, cpu)						\
+  tick(ticks, cpu);							\
   ea= memory[PC] + (memory[PC + 1] << 8);			\
   PC += 2;							\
   tickIf((ticks == 4) && ((ea >> 8) != ((ea + Y) >> 8)));	\
   ea += Y
 
-#define zp(ticks)				\
-  tick(ticks);					\
+#define zp(ticks, cpu)				\
+  tick(ticks, cpu);					\
   ea= memory[PC++];
 
-#define zpx(ticks)				\
-  tick(ticks);					\
+#define zpx(ticks, cpu)				\
+  tick(ticks, cpu);					\
   ea= memory[PC++] + X;				\
   ea &= 0x00ff;
 
-#define zpy(ticks)				\
-  tick(ticks);					\
+#define zpy(ticks, cpu)				\
+  tick(ticks, cpu);					\
   ea= memory[PC++] + Y;				\
   ea &= 0x00ff;
 
-#define indx(ticks)				\
-  tick(ticks);					\
+#define indx(ticks, cpu)				\
+  tick(ticks, cpu);					\
   {						\
     byte tmp= memory[PC++] + X;			\
     ea= memory[tmp] + (memory[tmp + 1] << 8);	\
   }
 
-#define indy(ticks)						\
-  tick(ticks);							\
+#define indy(ticks, cpu)						\
+  tick(ticks, cpu);							\
   {								\
     byte tmp= memory[PC++];					\
     ea= memory[tmp] + (memory[tmp + 1] << 8);			\
@@ -155,16 +155,16 @@ enum {
     ea += Y;							\
   }
 
-#define indabsx(ticks)					\
-  tick(ticks);						\
+#define indabsx(ticks, cpu)					\
+  tick(ticks, cpu);						\
   {							\
     word tmp;						\
     tmp= memory[PC ] + (memory[PC  + 1] << 8) + X;	\
     ea = memory[tmp] + (memory[tmp + 1] << 8);		\
   }
 
-#define indzp(ticks)					\
-  tick(ticks);						\
+#define indzp(ticks, cpu)					\
+  tick(ticks, cpu);						\
   {							\
     byte tmp;						\
     tmp= memory[PC++];					\
@@ -173,8 +173,8 @@ enum {
 
 /* insns */
 
-#define adc(ticks, adrmode)								\
-  adrmode(ticks);									\
+#define adc(ticks, cpu, adrmode)								\
+  adrmode(ticks, cpu);									\
   {											\
     byte B= getMemory(ea);								\
     if (!getD())									\
@@ -199,13 +199,13 @@ enum {
 	/* only C is valid on NMOS 6502 */						\
 	setNVZC(s & 0x80, !(((A ^ B) & 0x80) && ((A ^ s) & 0x80)), !s, !!(h & 0x80));	\
 	A= s;										\
-	tick(1);									\
+	tick(1, cpu);									\
 	next();										\
       }											\
   }
 
-#define sbc(ticks, adrmode)								\
-  adrmode(ticks);									\
+#define sbc(ticks, cpu, adrmode)								\
+  adrmode(ticks, cpu);									\
   {											\
     byte B= getMemory(ea);								\
     if (!getD())									\
@@ -232,13 +232,13 @@ enum {
 	/* only C is valid on NMOS 6502 */						\
 	setNVZC(s & 0x80, !(((A ^ B) & 0x80) && ((A ^ s) & 0x80)), !s, !!(h & 0x80));	\
 	A= s;										\
-	tick(1);									\
+	tick(1, cpu);									\
 	next();										\
       }											\
   }
 
-#define cmpR(ticks, adrmode, R)			\
-  adrmode(ticks);				\
+#define cmpR(ticks, cpu, adrmode, R)			\
+  adrmode(ticks, cpu);				\
   fetch();					\
   {						\
     byte B= getMemory(ea);			\
@@ -247,12 +247,12 @@ enum {
   }						\
   next();
 
-#define cmp(ticks, adrmode)	cmpR(ticks, adrmode, A)
-#define cpx(ticks, adrmode)	cmpR(ticks, adrmode, X)
-#define cpy(ticks, adrmode)	cmpR(ticks, adrmode, Y)
+#define cmp(ticks, cpu, adrmode)	cmpR(ticks, cpu, adrmode, A)
+#define cpx(ticks, cpu, adrmode)	cmpR(ticks, cpu, adrmode, X)
+#define cpy(ticks, cpu, adrmode)	cmpR(ticks, cpu, adrmode, Y)
 
-#define dec(ticks, adrmode)			\
-  adrmode(ticks);				\
+#define dec(ticks, cpu, adrmode)			\
+  adrmode(ticks, cpu);				\
   fetch();					\
   {						\
     byte B= getMemory(ea);			\
@@ -262,19 +262,19 @@ enum {
   }						\
   next();
 
-#define decR(ticks, adrmode, R)			\
+#define decR(ticks, cpu, adrmode, R)			\
   fetch();					\
-  tick(ticks);					\
+  tick(ticks, cpu);					\
   --R;						\
   setNZ(R & 0x80, !R);				\
   next();
 
-#define dea(ticks, adrmode)	decR(ticks, adrmode, A)
-#define dex(ticks, adrmode)	decR(ticks, adrmode, X)
-#define dey(ticks, adrmode)	decR(ticks, adrmode, Y)
+#define dea(ticks, cpu, adrmode)	decR(ticks, cpu, adrmode, A)
+#define dex(ticks, cpu, adrmode)	decR(ticks, cpu, adrmode, X)
+#define dey(ticks, cpu, adrmode)	decR(ticks, cpu, adrmode, Y)
 
-#define inc(ticks, adrmode)			\
-  adrmode(ticks);				\
+#define inc(ticks, cpu, adrmode)			\
+  adrmode(ticks, cpu);				\
   fetch();					\
   {						\
     byte B= getMemory(ea);			\
@@ -284,19 +284,19 @@ enum {
   }						\
   next();
 
-#define incR(ticks, adrmode, R)			\
+#define incR(ticks, cpu, adrmode, R)			\
   fetch();					\
-  tick(ticks);					\
+  tick(ticks, cpu);					\
   ++R;						\
   setNZ(R & 0x80, !R);				\
   next();
 
-#define ina(ticks, adrmode)	incR(ticks, adrmode, A)
-#define inx(ticks, adrmode)	incR(ticks, adrmode, X)
-#define iny(ticks, adrmode)	incR(ticks, adrmode, Y)
+#define ina(ticks, cpu, adrmode)	incR(ticks, cpu, adrmode, A)
+#define inx(ticks, cpu, adrmode)	incR(ticks, cpu, adrmode, X)
+#define iny(ticks, cpu, adrmode)	incR(ticks, cpu, adrmode, Y)
 
-#define bit(ticks, adrmode)			\
-  adrmode(ticks);				\
+#define bit(ticks, cpu, adrmode)			\
+  adrmode(ticks, cpu);				\
   fetch();					\
   {						\
     byte B= getMemory(ea);			\
@@ -305,8 +305,8 @@ enum {
   }						\
   next();
 
-#define tsb(ticks, adrmode)			\
-  adrmode(ticks);				\
+#define tsb(ticks, cpu, adrmode)			\
+  adrmode(ticks, cpu);				\
   fetch();					\
   {						\
     byte b= getMemory(ea);			\
@@ -316,8 +316,8 @@ enum {
   }						\
   next();
 
-#define trb(ticks, adrmode)			\
-  adrmode(ticks);				\
+#define trb(ticks, cpu, adrmode)			\
+  adrmode(ticks, cpu);				\
   fetch();					\
   {						\
     byte b= getMemory(ea);			\
@@ -327,19 +327,19 @@ enum {
   }						\
   next();
 
-#define bitwise(ticks, adrmode, op)		\
-  adrmode(ticks);				\
+#define bitwise(ticks, cpu, adrmode, op)		\
+  adrmode(ticks, cpu);				\
   fetch();					\
   A op##= getMemory(ea);			\
   setNZ(A & 0x80, !A);				\
   next();
 
-#define and(ticks, adrmode)	bitwise(ticks, adrmode, &)
-#define eor(ticks, adrmode)	bitwise(ticks, adrmode, ^)
-#define ora(ticks, adrmode)	bitwise(ticks, adrmode, |)
+#define and(ticks, cpu, adrmode)	bitwise(ticks, cpu, adrmode, &)
+#define eor(ticks, cpu, adrmode)	bitwise(ticks, cpu, adrmode, ^)
+#define ora(ticks, cpu, adrmode)	bitwise(ticks, cpu, adrmode, |)
 
-#define asl(ticks, adrmode)			\
-  adrmode(ticks);				\
+#define asl(ticks, cpu, adrmode)			\
+  adrmode(ticks, cpu);				\
   {						\
     unsigned int i= getMemory(ea) << 1;		\
     putMemory(ea, i);				\
@@ -348,8 +348,8 @@ enum {
   }						\
   next();
 
-#define asla(ticks, adrmode)			\
-  tick(ticks);					\
+#define asla(ticks, cpu, adrmode)			\
+  tick(ticks, cpu);					\
   fetch();					\
   {						\
     int c= A >> 7;				\
@@ -358,8 +358,8 @@ enum {
   }						\
   next();
 
-#define lsr(ticks, adrmode)			\
-  adrmode(ticks);				\
+#define lsr(ticks, cpu, adrmode)			\
+  adrmode(ticks, cpu);				\
   {						\
     byte b= getMemory(ea);			\
     int  c= b & 1;				\
@@ -370,8 +370,8 @@ enum {
   }						\
   next();
 
-#define lsra(ticks, adrmode)			\
-  tick(ticks);					\
+#define lsra(ticks, cpu, adrmode)			\
+  tick(ticks, cpu);					\
   fetch();					\
   {						\
     int c= A & 1;				\
@@ -380,8 +380,8 @@ enum {
   }						\
   next();
 
-#define rol(ticks, adrmode)			\
-  adrmode(ticks);				\
+#define rol(ticks, cpu, adrmode)			\
+  adrmode(ticks, cpu);				\
   {						\
     word b= (getMemory(ea) << 1) | getC();	\
     fetch();					\
@@ -390,8 +390,8 @@ enum {
   }						\
   next();
 
-#define rola(ticks, adrmode)			\
-  tick(ticks);					\
+#define rola(ticks, cpu, adrmode)			\
+  tick(ticks, cpu);					\
   fetch();					\
   {						\
     word b= (A << 1) | getC();			\
@@ -400,8 +400,8 @@ enum {
   }						\
   next();
 
-#define ror(ticks, adrmode)			\
-  adrmode(ticks);				\
+#define ror(ticks, cpu, adrmode)			\
+  adrmode(ticks, cpu);				\
   {						\
     int  c= getC();				\
     byte m= getMemory(ea);			\
@@ -412,8 +412,8 @@ enum {
   }						\
   next();
 
-#define rora(ticks, adrmode)			\
-  adrmode(ticks);				\
+#define rora(ticks, cpu, adrmode)			\
+  adrmode(ticks, cpu);				\
   {						\
     int ci= getC();				\
     int co= A & 1;				\
@@ -423,80 +423,80 @@ enum {
   }						\
   next();
 
-#define tRS(ticks, adrmode, R, S)		\
+#define tRS(ticks, cpu, adrmode, R, S)		\
   fetch();					\
-  tick(ticks);					\
+  tick(ticks, cpu);					\
   S= R;						\
   setNZ(S & 0x80, !S);				\
   next();
 
-#define tax(ticks, adrmode)	tRS(ticks, adrmode, A, X)
-#define txa(ticks, adrmode)	tRS(ticks, adrmode, X, A)
-#define tay(ticks, adrmode)	tRS(ticks, adrmode, A, Y)
-#define tya(ticks, adrmode)	tRS(ticks, adrmode, Y, A)
-#define tsx(ticks, adrmode)	tRS(ticks, adrmode, S, X)
+#define tax(ticks, cpu, adrmode)	tRS(ticks, cpu, adrmode, A, X)
+#define txa(ticks, cpu, adrmode)	tRS(ticks, cpu, adrmode, X, A)
+#define tay(ticks, cpu, adrmode)	tRS(ticks, cpu, adrmode, A, Y)
+#define tya(ticks, cpu, adrmode)	tRS(ticks, cpu, adrmode, Y, A)
+#define tsx(ticks, cpu, adrmode)	tRS(ticks, cpu, adrmode, S, X)
 
-#define txs(ticks, adrmode)			\
+#define txs(ticks, cpu, adrmode)			\
   fetch();					\
-  tick(ticks);					\
+  tick(ticks, cpu);					\
   S= X;						\
   next();
 
-#define ldR(ticks, adrmode, R)			\
-  adrmode(ticks);				\
+#define ldR(ticks, cpu, adrmode, R)			\
+  adrmode(ticks, cpu);				\
   fetch();					\
   R= getMemory(ea);				\
   setNZ(R & 0x80, !R);				\
   next();
 
-#define lda(ticks, adrmode)	ldR(ticks, adrmode, A)
-#define ldx(ticks, adrmode)	ldR(ticks, adrmode, X)
-#define ldy(ticks, adrmode)	ldR(ticks, adrmode, Y)
+#define lda(ticks, cpu, adrmode)	ldR(ticks, cpu, adrmode, A)
+#define ldx(ticks, cpu, adrmode)	ldR(ticks, cpu, adrmode, X)
+#define ldy(ticks, cpu, adrmode)	ldR(ticks, cpu, adrmode, Y)
 
-#define stR(ticks, adrmode, R)			\
-  adrmode(ticks);				\
+#define stR(ticks, cpu, adrmode, R)			\
+  adrmode(ticks, cpu);				\
   fetch();					\
   putMemory(ea, R);				\
   next();
 
-#define sta(ticks, adrmode)	stR(ticks, adrmode, A)
-#define stx(ticks, adrmode)	stR(ticks, adrmode, X)
-#define sty(ticks, adrmode)	stR(ticks, adrmode, Y)
-#define stz(ticks, adrmode)	stR(ticks, adrmode, 0)
+#define sta(ticks, cpu, adrmode)	stR(ticks, cpu, adrmode, A)
+#define stx(ticks, cpu, adrmode)	stR(ticks, cpu, adrmode, X)
+#define sty(ticks, cpu, adrmode)	stR(ticks, cpu, adrmode, Y)
+#define stz(ticks, cpu, adrmode)	stR(ticks, cpu, adrmode, 0)
 
-#define branch(ticks, adrmode, cond)		\
+#define branch(ticks, cpu, adrmode, cond)		\
   if (cond)					\
     {						\
-      adrmode(ticks);				\
+      adrmode(ticks, cpu);				\
       PC += ea;					\
-      tick(1);					\
+      tick(1, cpu);					\
     }						\
   else						\
     {						\
-      tick(ticks);				\
+      tick(ticks, cpu);				\
       PC++;					\
     }						\
   fetch();					\
   next();
 
-#define bcc(ticks, adrmode)	branch(ticks, adrmode, !getC())
-#define bcs(ticks, adrmode)	branch(ticks, adrmode,  getC())
-#define bne(ticks, adrmode)	branch(ticks, adrmode, !getZ())
-#define beq(ticks, adrmode)	branch(ticks, adrmode,  getZ())
-#define bpl(ticks, adrmode)	branch(ticks, adrmode, !getN())
-#define bmi(ticks, adrmode)	branch(ticks, adrmode,  getN())
-#define bvc(ticks, adrmode)	branch(ticks, adrmode, !getV())
-#define bvs(ticks, adrmode)	branch(ticks, adrmode,  getV())
+#define bcc(ticks, cpu, adrmode)	branch(ticks, cpu, adrmode, !getC())
+#define bcs(ticks, cpu, adrmode)	branch(ticks, cpu, adrmode,  getC())
+#define bne(ticks, cpu, adrmode)	branch(ticks, cpu, adrmode, !getZ())
+#define beq(ticks, cpu, adrmode)	branch(ticks, cpu, adrmode,  getZ())
+#define bpl(ticks, cpu, adrmode)	branch(ticks, cpu, adrmode, !getN())
+#define bmi(ticks, cpu, adrmode)	branch(ticks, cpu, adrmode,  getN())
+#define bvc(ticks, cpu, adrmode)	branch(ticks, cpu, adrmode, !getV())
+#define bvs(ticks, cpu, adrmode)	branch(ticks, cpu, adrmode,  getV())
 
-#define bra(ticks, adrmode)			\
-  adrmode(ticks);				\
+#define bra(ticks, cpu, adrmode)			\
+  adrmode(ticks, cpu);				\
   PC += ea;					\
   fetch();					\
-  tick(1);					\
+  tick(1, cpu);					\
   next();
 
-#define jmp(ticks, adrmode)				\
-  adrmode(ticks);					\
+#define jmp(ticks, cpu, adrmode)				\
+  adrmode(ticks, cpu);					\
   PC= ea;						\
   if (mpu->callbacks->call[ea])				\
     {							\
@@ -511,12 +511,12 @@ enum {
   fetch();						\
   next();
 
-#define jsr(ticks, adrmode)				\
+#define jsr(ticks, cpu, adrmode)				\
   PC++;							\
   push(PC >> 8);					\
   push(PC & 0xff);					\
   PC--;							\
-  adrmode(ticks);					\
+  adrmode(ticks, cpu);					\
   if (mpu->callbacks->call[ea])				\
     {							\
       word addr;					\
@@ -533,16 +533,16 @@ enum {
   fetch();						\
   next();
 
-#define rts(ticks, adrmode)			\
-  tick(ticks);					\
+#define rts(ticks, cpu, adrmode)			\
+  tick(ticks, cpu);					\
   PC  =  pop();					\
   PC |= (pop() << 8);				\
   PC++;						\
   fetch();					\
   next();
 
-#define brk(ticks, adrmode)					\
-  tick(ticks);							\
+#define brk(ticks, cpu, adrmode)					\
+  tick(ticks, cpu);							\
   PC++;								\
   push(PC >> 8);						\
   push(PC & 0xff);						\
@@ -566,74 +566,74 @@ enum {
   fetch();							\
   next();
 
-#define rti(ticks, adrmode)			\
-  tick(ticks);					\
+#define rti(ticks, cpu, adrmode)			\
+  tick(ticks, cpu);					\
   P=     pop();					\
   PC=    pop();					\
   PC |= (pop() << 8);				\
   fetch();					\
   next();
 
-#define nop(ticks, adrmode)			\
+#define nop(ticks, cpu, adrmode)			\
   fetch();					\
-  tick(ticks);					\
+  tick(ticks, cpu);					\
   next();
 
-#define ill(ticks, adrmode)						\
+#define ill(ticks, cpu, adrmode)						\
   fetch();								\
-  tick(ticks);								\
+  tick(ticks, cpu);								\
   fflush(stdout);							\
   fprintf(stderr, "\nundefined instruction %02X\n", memory[PC-1]);	\
   return;
 
-#define phR(ticks, adrmode, R)			\
+#define phR(ticks, cpu, adrmode, R)			\
   fetch();					\
-  tick(ticks);					\
+  tick(ticks, cpu);					\
   push(R);					\
   next();
 
-#define pha(ticks, adrmode)	phR(ticks, adrmode, A)
-#define phx(ticks, adrmode)	phR(ticks, adrmode, X)
-#define phy(ticks, adrmode)	phR(ticks, adrmode, Y)
-#define php(ticks, adrmode)	phR(ticks, adrmode, P | flagX | flagB)
+#define pha(ticks, cpu, adrmode)	phR(ticks, cpu, adrmode, A)
+#define phx(ticks, cpu, adrmode)	phR(ticks, cpu, adrmode, X)
+#define phy(ticks, cpu, adrmode)	phR(ticks, cpu, adrmode, Y)
+#define php(ticks, cpu, adrmode)	phR(ticks, cpu, adrmode, P | flagX | flagB)
 
-#define plR(ticks, adrmode, R)			\
+#define plR(ticks, cpu, adrmode, R)			\
   fetch();					\
-  tick(ticks);					\
+  tick(ticks, cpu);					\
   R= pop();					\
   setNZ(R & 0x80, !R);				\
   next();
 
-#define pla(ticks, adrmode)	plR(ticks, adrmode, A)
-#define plx(ticks, adrmode)	plR(ticks, adrmode, X)
-#define ply(ticks, adrmode)	plR(ticks, adrmode, Y)
+#define pla(ticks, cpu, adrmode)	plR(ticks, cpu, adrmode, A)
+#define plx(ticks, cpu, adrmode)	plR(ticks, cpu, adrmode, X)
+#define ply(ticks, cpu, adrmode)	plR(ticks, cpu, adrmode, Y)
 
-#define plp(ticks, adrmode)			\
+#define plp(ticks, cpu, adrmode)			\
   fetch();					\
-  tick(ticks);					\
+  tick(ticks, cpu);					\
   P= pop();					\
   next();
 
-#define clF(ticks, adrmode, F)			\
+#define clF(ticks, cpu, adrmode, F)			\
   fetch();					\
-  tick(ticks);					\
+  tick(ticks, cpu);					\
   P &= ~F;					\
   next();
 
-#define clc(ticks, adrmode)	clF(ticks, adrmode, flagC)
-#define cld(ticks, adrmode)	clF(ticks, adrmode, flagD)
-#define cli(ticks, adrmode)	clF(ticks, adrmode, flagI)
-#define clv(ticks, adrmode)	clF(ticks, adrmode, flagV)
+#define clc(ticks, cpu, adrmode)	clF(ticks, cpu, adrmode, flagC)
+#define cld(ticks, cpu, adrmode)	clF(ticks, cpu, adrmode, flagD)
+#define cli(ticks, cpu, adrmode)	clF(ticks, cpu, adrmode, flagI)
+#define clv(ticks, cpu, adrmode)	clF(ticks, cpu, adrmode, flagV)
 
-#define seF(ticks, adrmode, F)			\
+#define seF(ticks, cpu, adrmode, F)			\
   fetch();					\
-  tick(ticks);					\
+  tick(ticks, cpu);					\
   P |= F;					\
   next();
 
-#define sec(ticks, adrmode)	seF(ticks, adrmode, flagC)
-#define sed(ticks, adrmode)	seF(ticks, adrmode, flagD)
-#define sei(ticks, adrmode)	seF(ticks, adrmode, flagI)
+#define sec(ticks, cpu, adrmode)	seF(ticks, cpu, adrmode, flagC)
+#define sed(ticks, cpu, adrmode)	seF(ticks, cpu, adrmode, flagD)
+#define sei(ticks, cpu, adrmode)	seF(ticks, cpu, adrmode, flagI)
 
 #define do_insns(_)												\
   _(00, brk, implied,   7);  _(01, ora, indx,      6);  _(02, ill, implied,   2);  _(03, ill, implied, 2);      \
@@ -770,7 +770,7 @@ void M6502_run(M6502 *mpu)
 # define begin()				fetch();  next()
 # define fetch()				tpc= itabp[memory[PC++]]
 # define next()					goto *tpc
-# define dispatch(num, name, mode, cycles)	_##num: name(cycles, mode) oops();  next()
+# define dispatch(num, name, mode, cycles)	_##num: name(cycles, mpu, mode) oops();  next()
 # define end()
 
 #else /* (!__GNUC__) || (__STRICT_ANSI__) */
@@ -778,7 +778,7 @@ void M6502_run(M6502 *mpu)
 # define begin()				for (;;) switch (memory[PC++]) {
 # define fetch()
 # define next()					break
-# define dispatch(num, name, mode, cycles)	case 0x##num: name(cycles, mode);  next()
+# define dispatch(num, name, mode, cycles)	case 0x##num: name(cycles, mpu, mode);  next()
 # define end()					}
 
 #endif
@@ -812,20 +812,20 @@ void M6502_run(M6502 *mpu)
 
 void   M6502_tick(M6502 *mpu)
 {
-    if (! mpu->tick-- )
+    if (! mpu->ticks-- )
     {
-	M6502_step(mpu);
-	int next = mpu->memory[mpu->registers->pc];
+		mpu->ticks = 0;
+		M6502_step(mpu);
     }
 }
 
-void   M6502_step(M6502 *mpu)
+void M6502_step(M6502 *mpu)
 {
 
 # define begin()				switch (memory[PC++]) {
 # define fetch()
 # define next()					break
-# define dispatch(num, name, mode, cycles)	case 0x##num: name(cycles, mode);  next()
+# define dispatch(num, name, mode, cycles)	case 0x##num: name(cycles, mpu, mode);  next()
 # define end()					}
     
     
@@ -921,7 +921,7 @@ M6502 *M6502_new(M6502_Registers *registers, M6502_Memory memory, M6502_Callback
   mpu->registers = registers;
   mpu->memory    = memory;
   mpu->callbacks = callbacks;
-  mpu->tick = 0;
+  mpu->ticks     = 0;
 
   return mpu;
 }

@@ -43,7 +43,7 @@ struct _M6502
   uint8_t	  *memory;
   M6502_Callbacks *callbacks;
   unsigned int	   flags;
-  unsigned char    tick;
+  unsigned char    ticks;
 };
 
 enum {

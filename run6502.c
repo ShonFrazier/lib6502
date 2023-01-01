@@ -25,6 +25,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
+#include <setjmp.h>
 
 #include "config.h"
 #include "lib6502.h"
@@ -37,6 +38,8 @@ typedef uint16_t word;
 static char *program= 0;
 
 static byte bank[0x10][0x4000];
+
+static jmp_buf exit_6502_env;
 
 
 void fail(const char *fmt, ...)
@@ -89,7 +92,7 @@ int osword(M6502 *mpu, word address, byte data)
 	if (!fgets(buffer, length, stdin))
 	  {
 	    putchar('\n');
-	    exit(0);
+	    longjmp(exit_6502_env, 1);
 	  }
 	for (b= 0;  b < length;  ++b)
 	  if ((buffer[b] < minVal) || (buffer[b] > maxVal) || ('\n' == buffer[b]))
@@ -422,8 +425,7 @@ static int doMtrap(int argc, char **argv, M6502 *mpu)
   return 1;
 }
 
-
-static int xTrap(M6502 *mpu, word addr, byte data)	{ exit(0);  return 0; }
+static int xTrap(M6502 *mpu, word addr, byte data)	{ longjmp(exit_6502_env, 1);  return 0; }
 
 static int doXtrap(int argc, char **argv, M6502 *mpu)
 {
@@ -513,7 +515,10 @@ int main(int argc, char **argv)
     doBtraps(0, 0, mpu);
 
   M6502_reset(mpu);
-  M6502_run(mpu);
+
+  if (!setjmp(exit_6502_env)){
+    M6502_run(mpu);
+  }
   M6502_delete(mpu);
 
   return 0;

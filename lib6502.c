@@ -844,6 +844,8 @@ void M6502_step(M6502 *mpu)
     begin();
     do_insns(dispatch);
     end();
+
+    externalise();
     
 # undef begin
 # undef internalise

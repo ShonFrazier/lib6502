@@ -250,6 +250,7 @@ static void usage(int status)
   fprintf(stream, "usage: %s [option ...]\n", program);
   fprintf(stream, "       %s [option ...] -B [image ...]\n", program);
   fprintf(stream, "  -B                -- minimal Acorn 'BBC Model B' compatibility\n");
+  fprintf(stream, "  -c                -- print total number of instructions and cycles to stderr\n");
   fprintf(stream, "  -d addr last      -- dump memory between addr and last\n");
   fprintf(stream, "  -G addr           -- emulate getchar(3) at addr\n");
   fprintf(stream, "  -h                -- help (print this message)\n");
@@ -465,6 +466,7 @@ int main(int argc, char **argv)
 {
   M6502 *mpu= M6502_new(0, 0, 0);
   int bTraps= 0;
+  int countCycles = 0;
 
   program= argv[0];
 
@@ -479,6 +481,7 @@ int main(int argc, char **argv)
       {
 	int n= 0;
 	if      (!strcmp(*argv, "-B"))  bTraps= 1;
+	else if (!strcmp(*argv, "-c"))	countCycles = 1;
 	else if (!strcmp(*argv, "-d"))	n= doDisassemble(argc, argv, mpu);
 	else if (!strcmp(*argv, "-G"))	n= doGtrap(argc, argv, mpu);
 	else if (!strcmp(*argv, "-h"))	n= doHelp(argc, argv, mpu);
@@ -514,10 +517,23 @@ int main(int argc, char **argv)
   if (bTraps)
     doBtraps(0, 0, mpu);
 
-  M6502_reset(mpu);
+  volatile unsigned long isns = 0, cycles = 0;
 
   if (!setjmp(exit_6502_env)){
-    M6502_run(mpu);
+    M6502_reset(mpu);
+    if (countCycles){
+      while (1){
+	M6502_step(mpu);
+	isns++;
+	cycles += mpu->ticks;
+	mpu->ticks = 0;
+      }
+    } else {
+      M6502_run(mpu);
+    }
+  }
+  if (countCycles){
+    fprintf(stderr, "Instructions: %lu Cycles: %lu\n", isns, cycles);
   }
   M6502_delete(mpu);
 

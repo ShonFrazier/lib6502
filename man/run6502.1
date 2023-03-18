@@ -13,7 +13,7 @@
 .\" 
 .\" THE SOFTWARE IS PROVIDED 'AS IS'.  USE ENTIRELY AT YOUR OWN RISK.
 .\"
-.\" last edited: 2005-11-02 01:18:22 by piumarta on margaux.local
+.\" last edited: 2023-01-01 22:22:22 by brucehoult on m1-mini.local
 .\"
 .Dd October 31, 2005
 .Dt RUN6502 1 LOCAL
@@ -91,6 +91,8 @@ input-output via stdin and stdout.
 Any remaining non-option arguments on the command line will name files
 to be loaded successively into paged ROMs, starting at 15 and working
 downwards towards 0.
+.It Fl c
+Print total number of instructions executed and cycles to stderr at program exit.
 .It Fl d Ar addr Ar end
 dump memory from the address
 .Ar addr
